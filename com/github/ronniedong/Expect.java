@@ -1,15 +1,20 @@
+package com.github.ronniedong;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.lang.reflect.Array;
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.Pipe;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -52,6 +57,7 @@ public class Expect {
 	static {
 		log.setLevel(Level.ALL);
 	}
+	static final Charset charset = Charset.defaultCharset();
 	
 	private OutputStream output;
 	private Pipe.SourceChannel inputChannel;
@@ -164,7 +170,7 @@ public class Expect {
 	 * Convenience method to send a string to output handle
 	 */
 	public void send(String str) {
-		this.send(str.getBytes());
+		this.send(str.getBytes(charset));
 	}
 
 	/**
@@ -172,8 +178,8 @@ public class Expect {
 	 * Write a byte array to the output handle, notice flush()
 	 */
 	public void send(byte[] toWrite) {
-		//System.out.println("sending: " + bytesToPrintableString(toWrite));
-		log.info("sending: " + bytesToPrintableString(toWrite));
+		log.info("sendig (default enc.): " + new String(toWrite,charset) );		
+		log.info("sending bytes: " + bytesToPrintableString(toWrite));
 		try {
 			output.write(toWrite);
 			output.flush();
@@ -185,7 +191,7 @@ public class Expect {
 
 	private int default_timeout = 60;
 	private boolean restart_timeout_upon_receive = false;
-	private StringBuffer buffer = new StringBuffer();
+	private List<Byte> buffer =new LinkedList<Byte>();
 	private boolean notransfer = false;
 	
 	/**String before the last match(if there was a match),
@@ -281,21 +287,29 @@ public class Expect {
 		
 		try {
 			ByteBuffer bytes = ByteBuffer.allocate(1024);
+			String bufferStr = getBufferAsString(buffer);
 			int n;
 			while (true) {
+				bufferStr = getBufferAsString(buffer);
 				for (int i = 0; i < list.size(); i++) {
 					log.info("trying to match " + list.get(i)
-							+ " against buffer \"" + buffer + "\"");
-					Matcher m = list.get(i).matcher(buffer);
+							+ " against buffer \"" + bufferStr + "\"");
+					
+					
+					Matcher m = list.get(i).matcher(bufferStr);
 					if (m.find()) {
 						log.info("success!");
-						int matchStart = m.start(), matchEnd = m.end();
-						this.before = buffer.substring(0, matchStart);
+						int matchStart = m.start(),
+							matchEnd = m.end();
+						this.before = bufferStr.substring(0, matchStart);
 						this.match = m.group();
 						this.isSuccess = true;
-						if(!notransfer)buffer.delete(0, matchEnd);
+						if(!notransfer)
+							//buffer.delete(0, matchEnd);
+							removeSubStringFromList(buffer,0,matchEnd);
 						return i;
 					}
+					
 				}
 
 				long waitTime = endTime - System.currentTimeMillis();
@@ -324,13 +338,12 @@ public class Expect {
 				}
 				StringBuilder tmp = new StringBuilder();
 				for (int i = 0; i < n; i++) {
-					buffer.append((char) bytes.get(i));
+					buffer.add(bytes.get(i));
 					tmp.append(byteToPrintableString(bytes.get(i)));
 				}
 				log.debug("Obtained following from InputStream: " + tmp);
 				bytes.clear();
 				
-				//System.out.println(buffer);
 			}
 		} catch (IOException e) {
 			//e.printStackTrace();
@@ -339,6 +352,38 @@ public class Expect {
 			return RETV_IOEXCEPTION;
 		}
 		
+	}
+	/**
+	 * Remove bytes from list that equals the indicated substring
+	 * @param buffer
+	 * @param subStringStart
+	 * @param subStringEnd
+	 */
+	static protected void removeSubStringFromList(List<Byte> buffer, int subStringStart, int subStringEnd) {
+		String bufferStr = getBufferAsString(buffer);
+		int byteStart = bufferStr.substring(0, subStringStart).getBytes().length;
+		int byteEnd   = bufferStr.substring(0, subStringEnd).getBytes().length;
+		
+		//delete the first byte of the substring until substring is consumed
+		for(int i_deleted_byte=0; i_deleted_byte < byteEnd - byteStart; i_deleted_byte++)
+			buffer.remove(subStringStart);
+		
+	}
+
+	/**
+	 * Method that takes bytes from buffer and tries to encode them
+	 * @param buffer
+	 * @return
+	 */
+
+	static protected String getBufferAsString(List<Byte> buffer) {
+		byte[] bytes = new byte[buffer.size()];
+		//thank you, Oracle for not compatibilizing primitives to to their corresponding classes
+		//buffer.toArray(bytes);
+		for(int i=0;i<buffer.size();i++)
+			bytes[i] = buffer.get(i);
+			
+		return new String(bytes, charset);
 	}
 
 	/**
@@ -356,8 +401,8 @@ public class Expect {
 		int retv = expect(timeout, new ArrayList<Pattern>());
 		if (retv == RETV_EOF) {
 			this.isSuccess = true;
-			this.before = this.buffer.toString();
-			this.buffer.delete(0, buffer.length());
+			this.before = getBufferAsString(buffer);
+			this.buffer.clear();
 		}
 		return retv;
 	}
