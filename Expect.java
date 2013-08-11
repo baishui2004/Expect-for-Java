@@ -2,12 +2,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.Pipe;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -48,7 +50,7 @@ public class Expect {
 	static final Logger log = Logger.getLogger(Expect.class);
 	/**Logging is turned off by default.*/
 	static {
-		log.setLevel(Level.OFF);
+		log.setLevel(Level.ALL);
 	}
 	
 	private OutputStream output;
@@ -206,8 +208,25 @@ public class Expect {
 	 * @param patterns
 	 * @return
 	 */
-	public int expect(Object... patterns) {
-		return expect(default_timeout, patterns);
+	public int expect(Object... args) {
+            if(args.length>1){
+                if(args[0] instanceof Integer){
+                    if(args.length == 2)
+                        return expectPatternList((Integer)args[0],
+                                (List<Pattern>)args[1]);
+                    else{
+                        //copy the rest of arguments
+                        Object [] other_args = new Object[args.length-1];
+                        for(int i=0;i<args.length-1;i++)
+                            other_args[i]=args[i+1];
+                        return expectBeforeTimeout((Integer)args[0],
+                               other_args);
+                    }
+                }
+            }
+            //only one parameter... probably a String
+            return expectBeforeTimeout(default_timeout, args);
+            
 	}
 
 	/**
@@ -221,7 +240,7 @@ public class Expect {
 	 * @param patterns
 	 * @return
 	 */
-	public int expect(int timeout, Object... patterns) {
+	public int expectBeforeTimeout(int timeout, Object... patterns) {
 		ArrayList<Pattern> list = new ArrayList<Pattern>();
 		for (Object o : patterns) {
 			if (o instanceof String)
@@ -235,7 +254,7 @@ public class Expect {
 				list.add(Pattern.compile(Pattern.quote(o.toString())));
 			}
 		}
-		return expect(timeout, list);
+		return expectPatternList(timeout, list);
 	}
 	
 	/**
@@ -254,7 +273,7 @@ public class Expect {
 	 *         0); or a negative number if there is an IOException, EOF or
 	 *         timeout
 	 */
-	public int expect(int timeout, List<Pattern> list) {
+	public int expectPatternList(int timeout, List<Pattern> list) {
 		log.debug("Expecting " + list);
 		
 		clearGlobalVariables();
@@ -265,11 +284,11 @@ public class Expect {
 			int n;
 			while (true) {
 				for (int i = 0; i < list.size(); i++) {
-					log.trace("trying to match " + list.get(i)
+					log.info("trying to match " + list.get(i)
 							+ " against buffer \"" + buffer + "\"");
 					Matcher m = list.get(i).matcher(buffer);
 					if (m.find()) {
-						log.trace("success!");
+						log.info("success!");
 						int matchStart = m.start(), matchEnd = m.end();
 						this.before = buffer.substring(0, matchStart);
 						this.match = m.group();
@@ -388,7 +407,7 @@ public class Expect {
 	 *             when there is a problem reading from the InputStream
 	 * @return same as {@link #expect(int, Object...) expect(timeout, patterns)}
 	 */
-	public int expectOrThrow(int timeout, Object... patterns)
+	public int expectBeforeTimeoutOrThrow(int timeout, Object... patterns)
 			throws TimeoutException, EOFException, IOException {
 		int retv = expect(timeout, patterns);
 		switch (retv) {
@@ -404,9 +423,17 @@ public class Expect {
 	}
 	/**Convenience method, same as calling {@link #expectOrThrow(int, Object...)
 	 * expectOrThrow(default_timeout, patterns)}*/
-	public int expectOrThrow(Object... patterns) throws TimeoutException,
+	public int expectOrThrow(Object... args) throws TimeoutException,
 			EOFException, IOException {
-		return expectOrThrow(default_timeout, patterns);
+            int timeout = default_timeout;
+            Object[] sub_args = args;
+            if(args[0] instanceof Integer){
+                Object [] other_args = new Object[args.length-1];
+                for(int i=0;i<args.length-1;i++)
+                    other_args[i]=args[i+1];
+                sub_args = other_args;
+            }
+            return expectOrThrow(timeout, sub_args);
 	}
 	
 	private void clearGlobalVariables() {
@@ -535,5 +562,13 @@ public class Expect {
 	public static void forwardInputStreamTo(PrintStream duplicatedTo) {
 		Expect.duplicatedTo = duplicatedTo;
 	}
+        /**
+         * ??????????????????????????????????????????????????????????
+         * @param in
+         * @param from
+         * @return 
+         */
+        /*protected static Object[] copyObjectArrayFrom(Object[] in,int from){
+        }*/
 
 }
