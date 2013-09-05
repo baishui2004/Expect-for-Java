@@ -217,9 +217,17 @@ public class Expect {
 	public int expect(Object... args) {
             if(args.length>1){
                 if(args[0] instanceof Integer){
-                    if(args.length == 2)
-                        return expectPatternList((Integer)args[0],
-                                (List<Pattern>)args[1]);
+                    if(args.length == 2){
+                    	if(args[1] instanceof Pattern){
+                    		List<Pattern> l = new LinkedList<Pattern>();
+                    		l.add((Pattern)args[1]);
+                    		return expectPatternList((Integer)args[0],
+                    				l);
+                    	}
+                    	else
+                    		return expectPatternList((Integer)args[0],
+                    				(List<Pattern>)args[1]);
+                    }
                     else{
                         //copy the rest of arguments
                         Object [] other_args = new Object[args.length-1];
