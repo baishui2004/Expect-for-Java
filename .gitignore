@@ -1,6 +1,13 @@
 *.class
+target
 
-# Package Files #
+# Package Files
 *.jar
 *.war
 *.ear
+
+# Intellij IDE Files
+*.iml
+*.ipr
+*.iws
+expect-for-java.log

@@ -1,11 +1,12 @@
-package com.github.ronniedong;
+package com.github.ronniedong.expectforjava;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
-import java.lang.reflect.Array;
-import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.Pipe;
@@ -13,18 +14,11 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.log4j.ConsoleAppender;
-import org.apache.log4j.FileAppender;
-import org.apache.log4j.Layout;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-import org.apache.log4j.PatternLayout;
 
 
 /**
@@ -52,11 +46,8 @@ import org.apache.log4j.PatternLayout;
  * @version 1.1
  */
 public class Expect {
-	static final Logger log = Logger.getLogger(Expect.class);
-	/**Logging is turned off by default.*/
-	static {
-		log.setLevel(Level.ALL);
-	}
+	static final Logger log = LoggerFactory.getLogger(Expect.class);
+
 	static final Charset charset = Charset.defaultCharset();
 	
 	private OutputStream output;
@@ -70,7 +61,7 @@ public class Expect {
 			selector = Selector.open();
 			inputChannel.register(selector, SelectionKey.OP_READ);
 		} catch (IOException e) {
-			log.fatal("Fatal error when initializing pipe or selector", e);
+			log.error("Fatal error when initializing pipe or selector", e);
 			//e.printStackTrace();
 		}
 		this.output = output;
@@ -78,7 +69,7 @@ public class Expect {
 	
 	/**
 	 * Essentially, this method converts an {@link InputStream} to a
-	 * {@link SelectableChannel}. A thread is created to read from the
+	 * {@link Pipe.SourceChannel}. A thread is created to read from the
 	 * InputStream, and write to a pipe. The source of the pipe is returned as
 	 * an input handle from which you can perform unblocking read. The thread
 	 * will terminate when reading EOF from InputStream, or when InputStream is
@@ -102,11 +93,11 @@ public class Expect {
 				byte[] buffer = new byte[1024];
 				try {
 					for (int n = 0; n != -1; n = input.read(buffer)) {
-						out.write(buffer, 0, n);
-						if (duplicatedTo != null) {
-							String toWrite = new String(buffer, 0, n);
-							duplicatedTo.append(toWrite);	// no Exception will be thrown
-						}
+							out.write(buffer, 0, n);
+							if (duplicatedTo != null) {
+								String toWrite = new String(buffer, 0, n);
+								duplicatedTo.append(toWrite);	// no Exception will be thrown
+							}
 					}
 					log.debug("EOF from InputStream");
 					input.close();		// now that input has EOF, close it.
@@ -208,10 +199,10 @@ public class Expect {
 			RETV_IOEXCEPTION = -9;
 	
 	/**
-	 * Convenience method, same as calling {@link #expect(int, Object...)
+	 * Convenience method, same as calling {@link #expectBeforeTimeout(int, Object...)
 	 * expect(default_timeout, patterns)}
 	 * 
-	 * @param patterns
+	 * @param args
 	 * @return
 	 */
 	public int expect(Object... args) {
@@ -225,8 +216,8 @@ public class Expect {
                     				l);
                     	}
                     	else
-                    		return expectPatternList((Integer)args[0],
-                    				(List<Pattern>)args[1]);
+                    		return expectBeforeTimeout((Integer)args[0],
+                    				args[1]);
                     }
                     else{
                         //copy the rest of arguments
@@ -245,7 +236,7 @@ public class Expect {
 
 	/**
 	 * Convenience method, internally it constructs a List{@literal <Pattern>}
-	 * using the object array, and call {@link #expect(int, List) } using the
+	 * using the object array, and call {@link #expectPatternList(int, List) } using the
 	 * List. The {@link String}s in the object array will be treated as
 	 * literals; meanwhile {@link Pattern}s will be directly added to the List.
 	 * If the array contains other objects, they will be converted by
@@ -395,15 +386,15 @@ public class Expect {
 	}
 
 	/**
-	 * Convenience method, internally it calls {@link #expect(int, List)
+	 * Convenience method, internally it calls {@link #expectPatternList(int, List)
 	 * expect(timeout, new ArrayList&lt;Pattern&gt;())}. Given an empty list,
-	 * {@link #expect(int, List)} will not perform any regex matching, therefore
+	 * {@link #expectPatternList(int, List)} will not perform any regex matching, therefore
 	 * the only conditions for it to return is EOF or timeout (or IOException).
 	 * If EOF is detected, {@link #isSuccess} and {@link #before} are properly
 	 * set.
 	 * 
 	 * @param timeout
-	 * @return same as return value of {@link #expect(int, List)}
+	 * @return same as return value of {@link #expectPatternList(int, List)}
 	 */
 	public int expectEOF(int timeout) {
 		int retv = expect(timeout, new ArrayList<Pattern>());
@@ -438,11 +429,11 @@ public class Expect {
 		return expectEOFOrThrow(default_timeout);
 	}
 
-	/**useful when calling {@link #expectOrThrow(int, Object...)}*/
+	/**useful when calling {@link #expectOrThrow(Object...)}*/
 	private IOException thrownIOE;
 	
 	/**
-	 * This method calls {@link #expect(int, Object...) expect(timeout,
+	 * This method calls {@link #expectBeforeTimeout(int, Object...) expect(timeout,
 	 * patterns)}, and throws checked exceptions when expect was not successful.
 	 * Useful when you want to simplify error handling: for example, when you
 	 * send a series of commands to an SSH server, you expect a prompt after
@@ -458,7 +449,7 @@ public class Expect {
 	 *             when EOF is encountered
 	 * @throws IOException
 	 *             when there is a problem reading from the InputStream
-	 * @return same as {@link #expect(int, Object...) expect(timeout, patterns)}
+	 * @return same as {@link #expectBeforeTimeout(int, Object...) expect(timeout, patterns)}
 	 */
 	public int expectBeforeTimeoutOrThrow(int timeout, Object... patterns)
 			throws TimeoutException, EOFException, IOException {
@@ -474,7 +465,7 @@ public class Expect {
 			return retv;
 		}
 	}
-	/**Convenience method, same as calling {@link #expectOrThrow(int, Object...)
+	/**Convenience method, same as calling {@link #expectOrThrow(Object...)
 	 * expectOrThrow(default_timeout, patterns)}*/
 	public int expectOrThrow(Object... args) throws TimeoutException,
 			EOFException, IOException {
@@ -518,6 +509,11 @@ public class Expect {
 		} catch (IOException e) {
 			log.warn("Exception when closing input Channel", e);
 			//e.printStackTrace();
+		}
+		try {
+			this.selector.close();
+		} catch (IOException e) {
+			log.warn("Exception when closing selector", e);
 		}
 	}
 	
@@ -575,27 +571,7 @@ public class Expect {
 	@SuppressWarnings("serial")
 	public static class EOFException extends Exception{
 	}
-	
-	private static Layout layout = new PatternLayout(
-			PatternLayout.TTCC_CONVERSION_PATTERN);
 
-	public static void addLogToConsole(Level level) {
-		log.setLevel(Level.ALL);
-		ConsoleAppender console = new ConsoleAppender(layout);
-		console.setThreshold(level);
-		log.addAppender(console);
-	}
-	public static void addLogToFile(String filename, Level level) throws IOException {
-		log.setLevel(Level.ALL);
-		FileAppender file = new FileAppender(layout, filename);
-		file.setThreshold(level);
-		log.addAppender(file);
-	}
-	public static void turnOffLogging(){
-		log.setLevel(Level.OFF);
-		log.removeAllAppenders();
-	}
-	
 	private static PrintStream duplicatedTo = null;
 	/**
 	 * While performing expect operations on the InputStream provided, duplicate

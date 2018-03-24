@@ -1,4 +1,5 @@
-package com.github.ronniedong;
+package com.github.ronniedong.expectforjava;
+
 import static org.junit.Assert.*;
 
 import java.io.IOException;
@@ -8,7 +9,6 @@ import java.nio.channels.Channels;
 import java.nio.channels.Pipe;
 import java.util.regex.Pattern;
 
-import org.apache.log4j.Level;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -72,8 +72,6 @@ public class TestExpect {
 			}
 		}).start();
 		
-		Expect.addLogToConsole(Level.ALL);
-		
 		Expect expect = new Expect(in, new NullOutputStream());
 		expect.expect(10, Pattern.compile(".*llo"));
 		assertEquals("hello", expect.match);
@@ -85,8 +83,6 @@ public class TestExpect {
 		expect.expectEOF(60);
 		assertTrue(expect.isSuccess);
 		expect.close();
-		
-		Expect.turnOffLogging();
 	}
 	
 	/**
@@ -264,8 +260,6 @@ public class TestExpect {
 			}
 		}).start();
 		
-		Expect.addLogToConsole(Level.ALL);
-		
 		Expect expect = new Expect(in, new NullOutputStream());
 		int retv = expect.expect(Pattern.compile(".*llo"), " wor");
 		assertEquals("hello", expect.match);
@@ -277,8 +271,6 @@ public class TestExpect {
 		
 		expect.expectEOF();
 		expect.close();
-		
-		Expect.turnOffLogging();
 	}
 	
 	/**
