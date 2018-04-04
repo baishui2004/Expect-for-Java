@@ -465,19 +465,20 @@ public class Expect {
 			return retv;
 		}
 	}
-	/**Convenience method, same as calling {@link #expectOrThrow(Object...)
+	/**Convenience method, same as calling {@link #expectBeforeTimeoutOrThrow(int, Object...)
 	 * expectOrThrow(default_timeout, patterns)}*/
 	public int expectOrThrow(Object... args) throws TimeoutException,
 			EOFException, IOException {
             int timeout = default_timeout;
             Object[] sub_args = args;
             if(args[0] instanceof Integer){
+				timeout = (Integer)args[0];
                 Object [] other_args = new Object[args.length-1];
                 for(int i=0;i<args.length-1;i++)
                     other_args[i]=args[i+1];
                 sub_args = other_args;
             }
-            return expectOrThrow(timeout, sub_args);
+            return expectBeforeTimeoutOrThrow(timeout, sub_args);
 	}
 	
 	private void clearGlobalVariables() {

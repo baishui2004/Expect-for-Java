@@ -109,9 +109,13 @@ public class TestExpect {
 			public void run() {
 				try {
 					while (true) {
-						if (Thread.interrupted())
+						try {
+							Thread.sleep(10);
+							out.write("hello".getBytes());
+						} catch (InterruptedException e) {
+							e.printStackTrace();
 							break;
-						out.write("hello".getBytes());
+						}
 					}
 					// Once the current thread is interrupted, the out channel is closed.
 					// see ClosedByInterruptException
